@@ -1,0 +1,88 @@
+<mujoco model="mycobot_280_m5">
+  <compiler angle="degree" autolimits="true"/>
+  <option timestep="0.01" gravity="0 0 -9.81"/>
+  <statistic center="0 0 0.18" extent="0.55"/>
+
+  <visual>
+    <global azimuth="135" elevation="-25" offwidth="760" offheight="520"/>
+    <quality shadowsize="2048"/>
+    <headlight ambient="0.35 0.35 0.35" diffuse="0.7 0.7 0.7" specular="0.2 0.2 0.2"/>
+    <rgba haze="0.9 0.93 0.97 1"/>
+  </visual>
+
+  <asset>
+    <material name="dark" rgba="0.10 0.12 0.16 1"/>
+    <material name="blue" rgba="0.10 0.42 0.58 1"/>
+    <material name="orange" rgba="0.92 0.47 0.18 1"/>
+    <material name="metal" rgba="0.72 0.76 0.80 1"/>
+    <material name="floor" rgba="0.86 0.89 0.92 1"/>
+  </asset>
+
+  <default>
+    <joint damping="1.4" armature="0.03" limited="true"/>
+    <geom contype="0" conaffinity="0"/>
+    <position kp="120" dampratio="1" forcerange="-25 25"/>
+  </default>
+
+  <worldbody>
+    <camera name="viewer" pos="0.43 -0.72 0.44" xyaxes="0.86 0.51 0 -0.22 0.37 0.90"/>
+    <light name="key" pos="0 -1.4 1.6" dir="0 1 -1"/>
+    <light name="fill" pos="-0.6 0.8 1.0" dir="0 -1 -0.5" diffuse="0.35 0.35 0.35"/>
+    <geom name="floor" type="plane" size="0.8 0.8 0.02" material="floor"/>
+
+    <body name="g_base" pos="0 0 0.03">
+      <geom name="m5_stack_base" type="box" size="0.105 0.085 0.03" material="dark"/>
+      <geom name="base_column" type="cylinder" pos="0 0 0.055" size="0.062 0.035" material="metal"/>
+
+      <body name="joint1" pos="0 0 0.10156">
+        <joint name="joint1" type="hinge" axis="0 0 1" range="-168 168"/>
+        <geom name="joint1_housing" type="cylinder" size="0.052 0.035" material="blue"/>
+        <geom name="joint1_cap" type="sphere" pos="0 0 0.036" size="0.043" material="orange"/>
+
+        <body name="joint2" pos="0 0 0.03" euler="0 90 -90">
+          <joint name="joint2" type="hinge" axis="0 0 1" range="-140 140"/>
+          <geom name="joint2_housing" type="cylinder" size="0.042 0.036" material="blue"/>
+          <body name="link2_vis" pos="-0.055 0 0">
+            <geom name="link2" type="capsule" fromto="0 0 0 -0.1104 0 0" size="0.022" material="orange"/>
+          </body>
+
+          <body name="joint3" pos="-0.1104 0 0">
+            <joint name="joint3" type="hinge" axis="0 0 1" range="-150 150"/>
+            <geom name="joint3_housing" type="cylinder" size="0.039 0.032" material="blue"/>
+            <geom name="link3" type="capsule" fromto="0 0 0 -0.096 0 0.06462" size="0.020" material="metal"/>
+
+            <body name="joint4" pos="-0.096 0 0.06462" euler="0 0 -90">
+              <joint name="joint4" type="hinge" axis="0 0 1" range="-150 150"/>
+              <geom name="joint4_housing" type="cylinder" size="0.034 0.030" material="orange"/>
+
+              <body name="joint5" pos="0 -0.07318 0" euler="90 -90 0">
+                <joint name="joint5" type="hinge" axis="0 0 1" range="-155 160"/>
+                <geom name="joint5_housing" type="cylinder" size="0.032 0.028" material="blue"/>
+                <geom name="link5" type="capsule" fromto="0 0 0 0 0.0456 0" size="0.017" material="metal"/>
+
+                <body name="joint6" pos="0 0.0456 0" euler="-90 0 0">
+                  <joint name="joint6" type="hinge" axis="0 0 1" range="-180 180"/>
+                  <geom name="joint6_housing" type="cylinder" size="0.028 0.024" material="orange"/>
+                  <body name="flange" pos="0 0 0.035">
+                    <geom name="flange_plate" type="cylinder" size="0.030 0.008" material="dark"/>
+                    <geom name="tool_stub" type="box" pos="0 0 0.026" size="0.028 0.018 0.018" material="metal"/>
+                    <site name="tcp" pos="0 0 0.055" size="0.008" rgba="0.1 0.8 0.45 1"/>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position name="act1" joint="joint1" ctrlrange="-2.932153 2.932153"/>
+    <position name="act2" joint="joint2" ctrlrange="-2.443461 2.443461"/>
+    <position name="act3" joint="joint3" ctrlrange="-2.617994 2.617994"/>
+    <position name="act4" joint="joint4" ctrlrange="-2.617994 2.617994"/>
+    <position name="act5" joint="joint5" ctrlrange="-2.705260 2.792527"/>
+    <position name="act6" joint="joint6" ctrlrange="-3.141593 3.141593"/>
+  </actuator>
+</mujoco>

@@ -1,0 +1,12 @@
+mycobot:
+  ros__parameters:
+    joint_names:
+      - joint1
+      - joint2
+      - joint3
+      - joint4
+      - joint5
+      - joint6
+    conservative_speed: 15
+    max_single_jog_degrees: 5.0
+

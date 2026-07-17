@@ -1,0 +1,8 @@
+pymycobot
+pyserial
+numpy
+mujoco
+pygame
+pillow
+matplotlib
+jupyter

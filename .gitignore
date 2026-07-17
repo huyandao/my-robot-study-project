@@ -1,0 +1,19 @@
+.DS_Store
+.idea/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.matplotlib-cache/
+
+# ROS 2 build products
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Isaac/experiment outputs
+isaac_ws/logs/
+isaac_ws/runs/
+policies/*.pt
+policies/*.onnx
