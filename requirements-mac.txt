@@ -1,7 +1,6 @@
-pymycobot
-pyserial
-numpy
-mujoco
+-r requirements.txt
+
+# Optional learning and legacy tools; the main application does not need them.
 pygame
 pillow
 matplotlib

@@ -40,7 +40,7 @@ def connect(args: argparse.Namespace):
     try:
         from pymycobot import MyCobot280
     except ImportError as exc:
-        raise SystemExit("pymycobot is not installed. Run: python -m pip install -r requirements-mac.txt") from exc
+        raise SystemExit("pymycobot is not installed. Run: python -m pip install -r requirements.txt") from exc
 
     return MyCobot280(args.port, args.baud)
 
@@ -97,4 +97,3 @@ def stop_robot(mc) -> None:
             print(f"Called mc.{method_name}()")
             return
     print("No stop/pause method found in this pymycobot version.", file=sys.stderr)
-

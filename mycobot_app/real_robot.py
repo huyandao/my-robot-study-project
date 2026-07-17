@@ -1,6 +1,6 @@
 """Physical myCobot 280 serial communication.
 
-Nothing in this module is used by WebUSB simulation control unless the user
+Nothing in this module is used by browser gamepad simulation control unless the user
 explicitly switches the web page to real-robot mode.
 """
 

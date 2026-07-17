@@ -1,4 +1,4 @@
-import { G30SWebUSBController } from "./gamepad.js";
+import { G30SController } from "./gamepad.js";
 
 const joints = Array.from({ length: 6 }, (_, index) => ({
   name: `J${index + 1}`,
@@ -270,7 +270,7 @@ function applyGamepadSimulation(status) {
   }
 }
 
-const gamepad = new G30SWebUSBController({
+const gamepad = new G30SController({
   api,
   getSpeed: () => Number(els.speedInput.value),
   isSimulationAllowed: () => !connected || mode === "sim",

@@ -53,7 +53,7 @@ class MujocoModel:
         try:
             import mujoco
         except ImportError as exc:
-            self.sim_error = "mujoco is not installed. Run: python -m pip install -r requirements-mac.txt"
+            self.sim_error = "mujoco is not installed. Run: python -m pip install -r requirements.txt"
             raise RuntimeError(self.sim_error) from exc
 
         with self._lock:

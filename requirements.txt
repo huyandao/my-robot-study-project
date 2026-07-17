@@ -1,0 +1,6 @@
+# Tested application dependencies for Python 3.11.
+# The bootstrap scripts install these into a local .venv for each computer.
+mujoco==3.10.0
+numpy==2.4.6
+pymycobot==4.0.5
+pyserial==3.5

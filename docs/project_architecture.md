@@ -68,10 +68,11 @@ run.py
 
 ### `mycobot_app/static/gamepad.js`
 
-雷神 G30S 的独立浏览器驱动：
+雷神 G30S 的独立跨平台浏览器驱动：
 
 - 识别 USB VID/PID `045e:028e`；
-- 请求 Chrome WebUSB 授权、寻找 IN endpoint、读取数据；
+- Windows 通过标准 Gamepad API 识别并轮询 XInput 手柄；
+- macOS/Linux 请求 Chrome WebUSB 授权、寻找 IN endpoint、读取数据；
 - 解析 Xbox 360 兼容的 20 字节输入报告；
 - 对摇杆应用 `0.12` 死区；
 - 把摇杆和十字键映射成 J1-J6 六维速度；
@@ -87,7 +88,7 @@ run.py
 - 显示六关节角度和 TCP 坐标；
 - 发送角度、点动、回零、停止；
 - 打开 Viewer、显示 Viewer 状态；
-- 创建 `G30SWebUSBController`，接收它的状态回调并更新页面。
+- 创建 `G30SController`，接收它的状态回调并更新页面。
 
 ### 其他资源
 
@@ -100,7 +101,8 @@ run.py
 ## 3. 启动过程
 
 ```text
-用户运行 .venv/bin/python run.py
+用户运行 start_windows.bat 或 start_macos_linux.sh
+  -> 首次运行创建本机 .venv 并安装 requirements.txt
   -> run.py 调用 server.main()
   -> 创建全局 ControlSession 和 NativeViewer
   -> ThreadingHTTPServer 监听 127.0.0.1:8000
@@ -115,8 +117,9 @@ run.py
 
 ```text
 G30S 接收器
-  -> Chrome WebUSB transferIn()
-  -> gamepad.js 解析 20 字节报告
+  -> Windows: Chrome/Edge Gamepad API 轮询 XInput
+     macOS/Linux: Chrome WebUSB transferIn()
+  -> gamepad.js 统一解析成六维输入
   -> 六维关节速度 [J1, J2, J3, J4, J5, J6]
   -> POST /api/gamepad
   -> server.py 的 ControlSession.apply_gamepad()
@@ -143,7 +146,7 @@ G30S 接收器
 ```
 
 网页服务维护的是控制仿真，原生 Viewer 是交互显示进程。关闭 Viewer 不会关闭网页、
-仿真状态或 WebUSB 连接。
+仿真状态或浏览器手柄连接。
 
 ## 6. 真机运行链路
 
@@ -162,7 +165,7 @@ G30S 接收器
 
 | 想修改的内容 | 文件 |
 | --- | --- |
-| G30S VID/PID、报告格式、按键映射 | `mycobot_app/static/gamepad.js` |
+| G30S Windows/XInput、VID/PID、报告格式、按键映射 | `mycobot_app/static/gamepad.js` |
 | 页面按钮、数据显示、API 调用 | `mycobot_app/static/app.js` |
 | 页面布局 | `mycobot_app/static/index.html`、`styles.css` |
 | MuJoCo 关节运动和 Viewer 相机默认视角 | `mycobot_app/mujoco_model.py` |
@@ -177,6 +180,7 @@ G30S 接收器
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+# Windows 使用 .venv\Scripts\python
 ```
 
 运行 G30S 报告解析测试（需要 Node.js）：
@@ -185,5 +189,5 @@ G30S 接收器
 node tests/gamepad_report_test.mjs
 ```
 
-浏览器 WebUSB 授权和原生 OpenGL 窗口依赖真实桌面与设备，最终仍需在 Chrome 中
+浏览器 Gamepad/WebUSB 设备发现和原生 OpenGL 窗口依赖真实桌面与设备，最终仍需在 Chrome/Edge 中
 各点击一次确认。

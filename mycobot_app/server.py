@@ -45,7 +45,7 @@ class ControlSession:
 
     def apply_gamepad(self, velocity: list[float], dt: float, speed: float) -> dict[str, Any]:
         if self.active_mode != "sim":
-            raise RuntimeError("WebUSB gamepad control is limited to MuJoCo simulation mode.")
+            raise RuntimeError("Browser gamepad control is limited to MuJoCo simulation mode.")
         return self.sim.apply_gamepad(velocity, dt, speed)
 
 
