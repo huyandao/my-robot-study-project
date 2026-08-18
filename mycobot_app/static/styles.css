@@ -235,8 +235,22 @@ input[type="number"] {
 
 .webusb-actions {
   display: flex;
+  align-items: end;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.gamepad-mode-field {
+  display: grid;
+  gap: 5px;
+  min-width: 160px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.gamepad-mode-field select {
+  min-height: 42px;
 }
 
 .gamepad-status-grid {
@@ -272,36 +286,58 @@ input[type="number"] {
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
+  text-align: right;
 }
 
-.native-viewer-stage {
-  min-height: 220px;
+.webgl-viewer-stage {
+  position: relative;
+  min-height: 520px;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: linear-gradient(135deg, #101828, #1f3b4d);
+  background: #0e141d;
   color: white;
-  display: grid;
-  grid-template-columns: auto minmax(220px, 1fr) auto;
-  align-items: center;
-  gap: 22px;
-  padding: 28px;
 }
 
-.native-viewer-stage p {
-  margin: 8px 0 0;
-  color: #bac7d5;
+#mujocoCanvas {
+  display: block;
+  width: 100%;
+  height: 520px;
+  outline: none;
+  touch-action: none;
 }
 
-.viewer-mark {
+.viewer-overlay {
+  position: absolute;
+  top: 14px;
+  left: 14px;
   display: grid;
-  width: 72px;
-  height: 72px;
-  place-items: center;
+  gap: 4px;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.1);
-  font-size: 24px;
-  font-weight: 900;
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: rgba(7, 12, 18, 0.72);
+  pointer-events: none;
+}
+
+.viewer-overlay span {
+  color: #bac7d5;
+  font-size: 12px;
+}
+
+.viewer-error {
+  color: #ffaaa4;
+}
+
+.native-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .speed {
@@ -399,9 +435,17 @@ input[type="range"] {
     grid-template-columns: repeat(3, 1fr);
   }
 
-  .native-viewer-stage {
-    grid-template-columns: 1fr;
-    align-items: start;
+  .webgl-viewer-stage {
+    min-height: 360px;
+  }
+
+  #mujocoCanvas {
+    height: 360px;
+  }
+
+  .native-viewer-toolbar {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

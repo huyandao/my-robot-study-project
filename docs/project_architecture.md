@@ -16,6 +16,8 @@ run.py
               ├── index.html
               ├── app.js
               ├── gamepad.js
+              ├── keyboard.js
+              ├── mujoco_viewer.js
               └── styles.css
 ```
 
@@ -34,6 +36,7 @@ run.py
 轻量 HTTP 服务和总调度层：
 
 - 把 `static/` 中的网页文件发送给 Chrome；
+- 通过 `/model-assets/` 安全地发送 myCobot 280 STL 给网页 WebGL；
 - 提供 `/api/connect`、`/api/status`、`/api/gamepad` 等接口；
 - 用 `ControlSession` 记录当前是 MuJoCo 模式还是真机模式；
 - 把请求转交给 `MujocoModel` 或 `RealRobotSession`；
@@ -78,6 +81,7 @@ run.py
 - 把摇杆和十字键映射成 J1-J6 六维速度；
 - 处理 A 回零、B 保持/恢复、Start 停止；
 - 每隔约 40 ms 调用 `/api/gamepad`；
+- 末端模式调用 `/api/gamepad/cartesian`，发送世界坐标 XYZ 速度；
 - 处理设备拔出、读取停止和 USB 释放。
 
 ### `mycobot_app/static/app.js`
@@ -89,6 +93,32 @@ run.py
 - 发送角度、点动、回零、停止；
 - 打开 Viewer、显示 Viewer 状态；
 - 创建 `G30SController`，接收它的状态回调并更新页面。
+
+### `mycobot_app/static/keyboard.js`
+
+键盘六关节控制器：
+
+- 把 `A/D`、`S/W`、`J/L`、`K/I`、上下和左右方向键映射为 J1-J6；
+- 多键同时按下时组合六维速度，相反方向同时按下时互相抵消；
+- 每隔约 40 ms 复用 `/api/gamepad` 发送关节速度；
+- 松键、窗口失焦或页面隐藏时清空输入；
+- 忽略输入框、下拉框和文本编辑区域中的按键。
+
+末端模式下将 `A/D`、`S/W`、`K/I` 映射为世界坐标 X、Y、Z，并调用与手柄相同
+的笛卡尔控制接口。
+
+### `mycobot_app/static/mujoco_viewer.js`
+
+网页实时三维视图：
+
+- 通过 `/model-assets/` 加载 `scene.xml` 使用的 7 个 STL；
+- 在 WebGL2 中复现 MJCF body/joint/geom 层级变换；
+- 使用后端 MuJoCo 返回的实际关节角绘制机械臂；
+- 显示实际 TCP 绿点和笛卡尔目标红点；
+- 提供旋转、平移和缩放视角交互。
+
+它不在网页重复运行物理引擎；Python MuJoCo 是唯一物理与 IK 状态源，WebGL 只负责
+把这份状态实时显示出来，因此无需传输 PNG 或视频帧。
 
 ### 其他资源
 
@@ -107,7 +137,7 @@ run.py
   -> 创建全局 ControlSession 和 NativeViewer
   -> ThreadingHTTPServer 监听 127.0.0.1:8000
   -> Chrome 打开首页
-  -> server.py 返回 index.html、app.js、gamepad.js、styles.css
+  -> server.py 返回 index.html、app.js、gamepad.js、keyboard.js、mujoco_viewer.js、styles.css
   -> app.js 读取当前状态、串口列表和 Viewer 状态
 ```
 
@@ -132,6 +162,33 @@ G30S 接收器
 
 如果当前连接的是真实机械臂，`ControlSession.apply_gamepad()` 会直接拒绝请求。这是
 手柄输入不会误发给真机的关键边界。
+
+末端 XYZ 模式使用平行链路：
+
+```text
+左摇杆 X/Y + 右摇杆上下 Z
+  -> gamepad.js 映射为世界坐标 linear_velocity
+  -> POST /api/gamepad/cartesian
+  -> 积分 cartesian_target
+  -> mj_jacSite() 计算 tcp 平动 Jacobian
+  -> DLS: Jᵀ(JJᵀ + λ²I)⁻¹
+  -> 关节速度/限位/奇异性保护
+  -> data.ctrl + mj_step()
+  -> 返回实际 TCP、目标坐标和 Jacobian 状态
+```
+
+切换到末端模式或按 A 时，目标点从当前 TCP 重新初始化，因此不会因历史目标产生跳变。
+
+键盘模式复用六关节控制链路：
+
+```text
+用户选择“电脑键盘”与控制目标，然后点击第 3 步启动
+  -> app.js 停用 G30S，并启用 KeyboardController
+  -> keyboard.js 监听六组按键
+  -> 生成六维关节速度 [J1, J2, J3, J4, J5, J6]
+  -> POST /api/gamepad
+  -> 与手柄六关节模式共用限速、执行器限位和 mj_step()
+```
 
 ## 5. 原生 Viewer 同步逻辑
 
