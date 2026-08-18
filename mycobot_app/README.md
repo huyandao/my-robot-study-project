@@ -19,18 +19,35 @@ start_windows.bat
 
 | 文件 | 职责 |
 | --- | --- |
-| `server.py` | HTTP API、静态网页服务、仿真/真机模式切换 |
-| `mujoco_model.py` | MuJoCo 模型加载、关节运动、原生 Viewer |
+| `server.py` | HTTP API、静态网页与模型资源服务、仿真/真机模式切换 |
+| `mujoco_model.py` | MuJoCo 模型、关节控制、末端 DLS 控制和原生 Viewer |
 | `real_robot.py` | 串口发现和真实 myCobot 通信 |
 | `static/gamepad.js` | G30S 跨平台识别、Windows XInput、WebUSB 报告解析和指令上传 |
 | `static/keyboard.js` | 键盘六轴/末端映射、连续指令发送和失焦安全释放 |
 | `static/mujoco_viewer.js` | 加载 STL、复现 MJCF 关节层级并在网页 WebGL 实时绘制 |
-| `static/app.js` | 页面按钮、状态、关节数据显示 |
+| `static/app.js` | 三步模式选择、输入控制器调度、API 调用和状态显示 |
 | `static/index.html` | 页面结构 |
 | `static/styles.css` | 页面样式 |
 
 MuJoCo 模型入口是 `models/mycobot_280/scene.xml`，模型网格在同目录的
-`upstream/` 中。
+`upstream/` 中。进一步的模块依赖和数据流见
+[`docs/project_architecture.md`](../docs/project_architecture.md)。
+
+## 三步选择与四种控制组合
+
+页面不要求先手动连接 MuJoCo。按照以下顺序选择后，第三步会自动加载后端模型：
+
+1. 选择“游戏手柄”或“电脑键盘”；
+2. 选择“机械臂六个轴”或“机械臂末端位置”；
+3. 点击“第 3 步 · 启动手柄控制”或“第 3 步 · 启动键盘控制”。
+
+| 输入设备 | 机械臂六个轴 | 机械臂末端位置 |
+| --- | --- | --- |
+| 游戏手柄 | 摇杆和十字键生成 J1-J6 速度 | 摇杆生成世界坐标 XYZ 目标速度 |
+| 电脑键盘 | 六组按键生成 J1-J6 速度 | 三组按键生成世界坐标 XYZ 目标速度 |
+
+切换输入设备时，页面会先停止旧控制器并释放其输入状态；切换控制目标时，后端会同步
+控制模式。进入末端模式时，目标点会从当前 TCP 初始化，避免突然跳向旧目标。
 
 ## 雷神 G30S
 
@@ -40,10 +57,11 @@ MuJoCo 模式可用，输入不会转发给真实机械臂。
 
 连接步骤：
 
-1. Windows：确认 G30S 处于 XInput 模式，按手柄任意键让浏览器发现设备。
-2. Windows：点击“检测并连接手柄”；该方式不弹出 USB 授权窗口。
-3. macOS/Linux：点击“检测并连接手柄”，在 Chrome 设备选择器中选择 `USB Controller`。
-4. 页面会在需要时自动连接 MuJoCo；小幅推动摇杆，确认网页 J1-J6 数值变化。
+1. 在第一步选择“游戏手柄”，在第二步选择控制目标。
+2. Windows：确认 G30S 处于 XInput 模式，按任意键让浏览器发现设备。
+3. 点击“第 3 步 · 启动手柄控制”。Windows 通常不会弹出 USB 授权窗口。
+4. macOS/Linux：在 Chrome/Edge 设备选择器中选择 `USB Controller` 并授权 WebUSB。
+5. 页面会自动连接 MuJoCo；小幅推动摇杆，观察关节或 TCP 数值变化。
 
 按键映射：
 
@@ -78,6 +96,9 @@ MuJoCo 模式可用，输入不会转发给真实机械臂。
 - 根据 Jacobian 最小奇异值自动增大阻尼；
 - 零空间回归到进入末端模式时的关节姿态。
 
+算法推导、变量含义、代码对应关系和学习实验见
+[`docs/cartesian_ik_dls.md`](../docs/cartesian_ik_dls.md)。
+
 浏览器使用 `0.12` 摇杆死区。后端把速度限制到 `[-1, 1]`，把单次时间间隔
 限制到 `0.1 s`，并把目标角度限制在模型执行器范围内。
 
@@ -111,6 +132,15 @@ MuJoCo 模式可用，输入不会转发给真实机械臂。
 展示的不是 PNG 或视频流；MuJoCo 在 Python 后端负责物理与 IK，浏览器负责实时三维
 显示。
 
+网页视图支持：
+
+- 鼠标左键拖动：旋转；
+- 鼠标右键或 `Shift + 左键` 拖动：平移；
+- 滚轮：缩放。
+
+如果模型区域空白，先确认页面状态显示 MuJoCo 已连接，再查看浏览器是否支持 WebGL2。
+WebGL 视图关闭或渲染失败不会改变后端仿真状态。
+
 ## MuJoCo 原生 Viewer
 
 网页不传输 PNG 图片。连接模拟器后点击“打开 MuJoCo 原生窗口”，后端会在
@@ -133,3 +163,10 @@ macOS 上通过 `mjpython` 启动 `mujoco_model.py`，以 25 Hz 从网页服务�
 - 如果设备忙，关闭占用手柄的其他网页或程序，再重新插拔接收器。
 - macOS/Linux 的 WebUSB 授权必须由用户点击触发，不能从命令行自动完成。
 - 页面占用设备期间，pygame/HID 命令行工具通常无法同时读取它。
+
+## 相关文档
+
+- [文档总导航](../docs/README.md)
+- [项目代码说明与运行逻辑](../docs/project_architecture.md)
+- [末端位置跟踪与 DLS 逆运动学](../docs/cartesian_ik_dls.md)
+- [MuJoCo 模型资源说明](../models/mycobot_280/README.md)

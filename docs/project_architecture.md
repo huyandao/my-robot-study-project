@@ -1,7 +1,7 @@
 # 项目代码说明与运行逻辑
 
-本文解释当前主程序的代码职责、模块依赖和一条控制指令从手柄到 MuJoCo 的完整
-运行过程。主程序入口只有根目录的 `run.py`。
+本文解释当前主程序的代码职责、模块依赖，以及键盘或手柄指令进入 MuJoCo、再同步
+到网页 WebGL 的完整过程。主程序入口只有根目录的 `run.py`。
 
 ## 1. 总体结构
 
@@ -52,6 +52,9 @@ run.py
 - 创建和维护 `MjModel`、`MjData`；
 - 读取角度、点动、回零、停止；
 - 把六维手柄速度积分为关节目标角度；
+- 把 XYZ 目标速度积分为空间目标点；
+- 用 TCP 平动 Jacobian 和 DLS 逆运动学计算关节速度；
+- 实施工作空间、目标距离、关节速度、关节限位和奇异性保护；
 - 限制时间步长、速度和执行器角度范围；
 - 用 `NativeViewer` 启动独立原生 Viewer；
 - Viewer 以 25 Hz 读取 `/api/status`，同步网页仿真中的六个关节。
@@ -86,13 +89,15 @@ run.py
 
 ### `mycobot_app/static/app.js`
 
-页面控制器，只负责普通 UI 和 HTTP 通信：
+页面控制器，负责 UI、输入控制器调度和 HTTP 通信：
 
 - 连接/断开仿真或真机；
+- 管理“输入设备 -> 控制目标 -> 启动”的三步选择；
 - 显示六关节角度和 TCP 坐标；
 - 发送角度、点动、回零、停止；
 - 打开 Viewer、显示 Viewer 状态；
-- 创建 `G30SController`，接收它的状态回调并更新页面。
+- 创建并互斥启停 `G30SController` 与 `KeyboardController`；
+- 创建 `MujocoWebViewer`，把后端状态同步到网页三维视图。
 
 ### `mycobot_app/static/keyboard.js`
 
@@ -141,9 +146,10 @@ run.py
   -> app.js 读取当前状态、串口列表和 Viewer 状态
 ```
 
-初始模式是 MuJoCo 仿真，但模型在用户点击连接或连接手柄时才真正加载。
+初始模式是 MuJoCo 仿真，但模型在用户手动连接，或完成第三步启动键盘/手柄控制时
+才真正加载。
 
-## 4. 手柄控制 MuJoCo 的运行链路
+## 4. 输入设备控制 MuJoCo 的运行链路
 
 ```text
 G30S 接收器
@@ -178,19 +184,37 @@ G30S 接收器
 ```
 
 切换到末端模式或按 A 时，目标点从当前 TCP 重新初始化，因此不会因历史目标产生跳变。
+完整算法说明见 [`cartesian_ik_dls.md`](cartesian_ik_dls.md)。
 
-键盘模式复用六关节控制链路：
+键盘模式复用同一套后端控制链路：
 
 ```text
 用户选择“电脑键盘”与控制目标，然后点击第 3 步启动
   -> app.js 停用 G30S，并启用 KeyboardController
   -> keyboard.js 监听六组按键
-  -> 生成六维关节速度 [J1, J2, J3, J4, J5, J6]
-  -> POST /api/gamepad
-  -> 与手柄六关节模式共用限速、执行器限位和 mj_step()
+  -> 六关节模式生成 [J1, J2, J3, J4, J5, J6] 并 POST /api/gamepad
+     末端模式生成 [X, Y, Z] 并 POST /api/gamepad/cartesian
+  -> 与手柄对应模式共用限速、限位、DLS 和 mj_step()
 ```
 
-## 5. 原生 Viewer 同步逻辑
+`/api/gamepad` 这个名称来自最早的手柄版本。键盘关节控制也复用它，因为后端接收的是
+与设备无关的六维方向量；它不表示后端只支持游戏手柄。
+
+## 5. 网页 WebGL 与原生 Viewer
+
+网页 WebGL 是默认显示方式：
+
+```text
+app.js 定期或在控制响应后得到 /api/status
+  -> 读取 angles、tcp、cartesian_target 和控制模式
+  -> mujoco_viewer.js 根据 angles 计算 MJCF 关节层级变换
+  -> 绘制 7 个 STL、TCP 绿点和目标红点
+```
+
+这里没有第二套动力学，也没有 PNG 截图流。`mujoco_viewer.js` 只复现显示所需的模型
+层级，所有物理、执行器和逆运动学状态都来自 Python MuJoCo。
+
+原生 Viewer 是可选的独立显示进程：
 
 ```text
 网页点击“打开 MuJoCo 原生窗口”
@@ -202,10 +226,28 @@ G30S 接收器
   -> mj_forward() + viewer.sync()
 ```
 
-网页服务维护的是控制仿真，原生 Viewer 是交互显示进程。关闭 Viewer 不会关闭网页、
-仿真状态或浏览器手柄连接。
+网页服务维护的是控制仿真，原生 Viewer 是交互显示进程。关闭原生 Viewer 不会关闭
+网页、仿真状态或浏览器输入控制器。
 
-## 6. 真机运行链路
+## 6. 主要 HTTP 接口
+
+| 接口 | 用途 |
+| --- | --- |
+| `GET /api/status` | 当前模式、连接状态、关节角、TCP、末端目标 |
+| `GET /api/ports` | 可用串口 |
+| `POST /api/connect` | 连接 MuJoCo 或真实机械臂 |
+| `POST /api/gamepad` | 与输入设备无关的六关节速度指令 |
+| `POST /api/gamepad/mode` | 切换关节/末端控制模式 |
+| `POST /api/gamepad/cartesian` | 末端 XYZ 速度指令 |
+| `POST /api/gamepad/cartesian/reset` | 把末端目标重置为当前 TCP |
+| `POST /api/send_angles`、`/api/jog` | 页面角度命令和单关节点动 |
+| `POST /api/stop`、`/api/home` | 停止和回零 |
+| `POST /api/viewer/open` | 打开 MuJoCo 原生 Viewer |
+
+`server.py` 还通过 `/model-assets/` 提供限定目录内的 STL 文件。接口的请求字段和边界
+校验以 `server.py` 为准。
+
+## 7. 真机运行链路
 
 ```text
 网页切换“真实机械臂”并选择串口
@@ -218,20 +260,25 @@ G30S 接收器
 
 切换模式前必须先断开现有连接。真机回零、释放舵机等高风险动作在页面还有二次确认。
 
-## 7. 修改代码时去哪里
+## 8. 修改代码时去哪里
 
 | 想修改的内容 | 文件 |
 | --- | --- |
 | G30S Windows/XInput、VID/PID、报告格式、按键映射 | `mycobot_app/static/gamepad.js` |
-| 页面按钮、数据显示、API 调用 | `mycobot_app/static/app.js` |
+| 键盘映射、按键循环和失焦释放 | `mycobot_app/static/keyboard.js` |
+| 页面按钮、模式选择、数据显示、API 调用 | `mycobot_app/static/app.js` |
 | 页面布局 | `mycobot_app/static/index.html`、`styles.css` |
-| MuJoCo 关节运动和 Viewer 相机默认视角 | `mycobot_app/mujoco_model.py` |
+| 网页三维模型层级、相机和交互 | `mycobot_app/static/mujoco_viewer.js` |
+| MuJoCo 关节运动、DLS 和原生 Viewer | `mycobot_app/mujoco_model.py` |
+| 末端跟踪、Jacobian 和 DLS 学习说明 | `docs/cartesian_ik_dls.md` |
 | 机械臂几何、执行器、灯光、地面 | `models/mycobot_280/scene.xml` |
 | HTTP API | `mycobot_app/server.py` |
 | 真机串口通信 | `mycobot_app/real_robot.py` |
 | 通用真机角度/速度安全限制 | `mac_hw_sandbox/mycobot_safe.py` |
+| Python 控制器测试 | `tests/test_mujoco_model.py` |
+| JavaScript 输入与视图测试 | `tests/gamepad_report_test.mjs` |
 
-## 8. 测试
+## 9. 测试
 
 运行 Python 模型测试：
 
@@ -240,7 +287,8 @@ G30S 接收器
 # Windows 使用 .venv\Scripts\python
 ```
 
-运行 G30S 报告解析测试（需要 Node.js）：
+运行 JavaScript 测试（需要 Node.js，覆盖 G30S 报告、键盘映射、末端请求和 WebGL
+模型逻辑）：
 
 ```bash
 node tests/gamepad_report_test.mjs

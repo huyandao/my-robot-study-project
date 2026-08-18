@@ -1,68 +1,73 @@
-# Mac First Lesson
+# macOS 第一次真机实验
 
-Goal: use the MacBook as the first development and hardware-control environment.
+目标：先验证 macOS 与 myCobot 280 M5 的串口通信，再进行保守的小范围动作。以下命令
+均从仓库根目录执行；不要把本机绝对路径写进项目文档。
 
-## 1. Activate Python
+## 1. 激活 Python 环境
 
 ```bash
-cd /Users/meng/Documents/robot/robot-learning
+cd my-robot-study-project
 source .venv/bin/activate
 export MPLCONFIGDIR="$PWD/.matplotlib-cache"
 ```
 
-Confirm imports:
+确认主程序依赖可以导入：
 
 ```bash
-python -c "import pymycobot, serial, numpy, matplotlib, jupyter; print('imports OK')"
+python -c "import pymycobot, serial, numpy; print('imports OK')"
 ```
 
-## 2. Connect myCobot
+如果 `.venv` 尚不存在，先运行 `./start_macos_linux.sh`，或按根 README 的手动安装步骤
+创建环境。Matplotlib 和 Jupyter 属于 `requirements-mac.txt` 中的可选学习工具，不是
+网页主程序的必需依赖。
 
-Plug the myCobot 280 M5 into the Mac with USB, then list serial devices:
+## 2. 连接 myCobot
+
+使用 USB 将 myCobot 280 M5 连接到 Mac，然后列出串口设备：
 
 ```bash
 ls /dev/cu.*
 ```
 
-Look for a device similar to:
+查找类似下面的设备：
 
 ```text
 /dev/cu.usbserial-XXXX
 ```
 
-Bluetooth devices are not the arm serial port.
+蓝牙设备不是机械臂串口。
 
-## 3. Read Angles First
+## 3. 先只读取角度
 
-Reading angles is the first real-arm experiment because it does not command motion:
+读取角度不会主动命令机械臂运动，因此应该作为第一次真机实验：
 
 ```bash
 python mac_hw_sandbox/read_angles.py --port /dev/cu.usbserial-XXXX
 ```
 
-Expected result: a list of six joint angles.
+预期结果是六个关节角度组成的列表。
 
-## 4. Only Then Move Slowly
+## 4. 确认读取正常后再低速运动
 
-After reading angles works, clear the workspace and run a small motion:
+确认角度读取正常后，清空机械臂周围空间，再执行小角度动作：
 
 ```bash
 python mac_hw_sandbox/single_joint_jog.py --port /dev/cu.usbserial-XXXX --joint 1 --delta 3 --speed 10 --yes
 ```
 
-If the motion direction is surprising, stop and do not continue.
+如果运动方向和预期不符，立即停止，不要继续。
 
-Return to the conservative home pose only when the workspace is clear:
+只有在工作空间安全时，才返回保守的初始姿态：
 
 ```bash
 python mac_hw_sandbox/safe_home.py --port /dev/cu.usbserial-XXXX --speed 10 --yes
 ```
 
-Emergency stop attempt over serial:
+通过串口尝试停止：
 
 ```bash
 python mac_hw_sandbox/emergency_stop.py --port /dev/cu.usbserial-XXXX
 ```
 
-The physical power switch is still the real emergency stop.
-
+串口停止不能替代物理急停或断电。执行动作时必须始终能够立即切断机械臂电源。完整
+检查项见[真机安全检查表](safety_checklist.md)。
