@@ -40,11 +40,25 @@
         <div class="panel webusb-panel">
           <div class="panel-head">
             <div>
-              <h2>雷神 G30S · 跨平台手柄</h2>
-              <p class="panel-copy">Windows 使用 XInput/Gamepad API，macOS/Linux 使用 WebUSB；仅控制 MuJoCo 仿真。</p>
+              <h2 id="inputControlTitle">雷神 G30S · 跨平台手柄</h2>
+              <p id="inputControlCopy" class="panel-copy">Windows 使用 XInput/Gamepad API，macOS/Linux 使用 WebUSB；仅控制 MuJoCo 仿真。</p>
             </div>
             <div class="webusb-actions">
-              <button id="webUsbConnectBtn">检测并连接手柄</button>
+              <label class="gamepad-mode-field">
+                <span>第 1 步 · 输入设备</span>
+                <select id="inputControlSource">
+                  <option value="gamepad">游戏手柄</option>
+                  <option value="keyboard">电脑键盘</option>
+                </select>
+              </label>
+              <label class="gamepad-mode-field">
+                <span>第 2 步 · 控制目标</span>
+                <select id="gamepadControlMode">
+                  <option value="joint">机械臂六个轴</option>
+                  <option value="cartesian">机械臂末端位置</option>
+                </select>
+              </label>
+              <button id="webUsbConnectBtn">第 3 步 · 启动手柄控制</button>
               <button id="webUsbDisconnectBtn" class="secondary" disabled>断开手柄</button>
             </div>
           </div>
@@ -62,24 +76,27 @@
               <code id="webUsbAxes">J1 +0.00 · J2 +0.00 · J3 +0.00 · J4 +0.00 · J5 +0 · J6 +0</code>
             </div>
           </div>
-          <p class="mapping-hint">左摇杆 J1/J2 · 右摇杆 J3/J4 · 十字键 J5/J6 · A 回零 · B 保持/恢复 · Start 停止</p>
+          <p id="gamepadMappingHint" class="mapping-hint">左摇杆 J1/J2 · 右摇杆 J3/J4 · 十字键 J5/J6 · A 回零 · B 保持/恢复 · Start 停止</p>
         </div>
 
         <div class="panel sim-panel">
           <div class="panel-head">
             <div>
-              <h2>MuJoCo 原生 Viewer</h2>
-              <p class="panel-copy">独立 OpenGL 窗口，支持鼠标旋转、平移、缩放和 MuJoCo 可视化菜单。</p>
+              <h2>MuJoCo 网页实时视图</h2>
+              <p class="panel-copy">后端 MuJoCo 运行物理与逆运动学，网页 WebGL 直接显示同一套 myCobot 280 网格。</p>
             </div>
             <div id="tcpReadout" class="tcp-readout">TCP: --</div>
           </div>
-          <div class="native-viewer-stage">
-            <div class="viewer-mark">MJ</div>
-            <div>
-              <strong id="nativeViewerStatus">原生窗口未打开</strong>
-              <p>先连接模拟器，再打开 Viewer。关闭原生窗口不会断开网页控制。</p>
+          <div class="webgl-viewer-stage">
+            <canvas id="mujocoCanvas" aria-label="myCobot 280 MuJoCo 实时三维视图"></canvas>
+            <div class="viewer-overlay">
+              <strong id="mujocoWebStatus">正在加载 myCobot 280 网格…</strong>
+              <span>左键旋转 · 右键/Shift 平移 · 滚轮缩放</span>
             </div>
-            <button id="openNativeViewerBtn" disabled>打开 MuJoCo 原生窗口</button>
+          </div>
+          <div class="native-viewer-toolbar">
+            <span id="nativeViewerStatus">原生 Viewer 未打开（可选）</span>
+            <button id="openNativeViewerBtn" class="secondary" disabled>另开 MuJoCo 原生窗口</button>
           </div>
         </div>
 

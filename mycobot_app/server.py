@@ -5,10 +5,11 @@ from __future__ import annotations
 import atexit
 import argparse
 import json
+import mimetypes
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from mac_hw_sandbox.mycobot_safe import DEFAULT_BAUD, DEFAULT_SPEED, SAFE_HOME_DEGREES
 from mycobot_app.mujoco_model import MujocoModel, NativeViewer
@@ -16,6 +17,7 @@ from mycobot_app.real_robot import RealRobotSession, list_serial_ports
 
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+MODEL_ASSET_DIR = Path(__file__).resolve().parents[1] / "models" / "mycobot_280"
 
 
 class ControlSession:
@@ -48,6 +50,26 @@ class ControlSession:
             raise RuntimeError("Browser gamepad control is limited to MuJoCo simulation mode.")
         return self.sim.apply_gamepad(velocity, dt, speed)
 
+    def set_gamepad_control_mode(self, control_mode: str) -> dict[str, Any]:
+        if self.active_mode != "sim":
+            raise RuntimeError("Browser gamepad control is limited to MuJoCo simulation mode.")
+        return self.sim.set_gamepad_control_mode(control_mode)
+
+    def apply_cartesian_gamepad(
+        self,
+        linear_velocity: list[float],
+        dt: float,
+        linear_speed: float,
+    ) -> dict[str, Any]:
+        if self.active_mode != "sim":
+            raise RuntimeError("Cartesian gamepad control is limited to MuJoCo simulation mode.")
+        return self.sim.apply_cartesian_gamepad(linear_velocity, dt, linear_speed)
+
+    def reset_cartesian_target(self) -> dict[str, Any]:
+        if self.active_mode != "sim":
+            raise RuntimeError("Cartesian gamepad control is limited to MuJoCo simulation mode.")
+        return self.sim.reset_cartesian_target()
+
 
 SESSION = ControlSession()
 VIEWER = NativeViewer()
@@ -73,8 +95,25 @@ class Handler(SimpleHTTPRequestHandler):
             self.call_json(SESSION.active().read_angles)
         elif path == "/api/viewer/status":
             self.write_json(VIEWER.status())
+        elif path.startswith("/model-assets/"):
+            self.serve_model_asset(path)
         else:
             super().do_GET()
+
+    def serve_model_asset(self, request_path: str) -> None:
+        relative = unquote(request_path.removeprefix("/model-assets/")).lstrip("/")
+        asset = (MODEL_ASSET_DIR / relative).resolve()
+        if not asset.is_relative_to(MODEL_ASSET_DIR.resolve()) or not asset.is_file():
+            self.send_error(404, "Model asset not found")
+            return
+        content = asset.read_bytes()
+        content_type = mimetypes.guess_type(asset.name)[0] or "application/octet-stream"
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(content)))
+        self.send_header("Cache-Control", "public, max-age=3600")
+        self.end_headers()
+        self.wfile.write(content)
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
@@ -101,6 +140,15 @@ class Handler(SimpleHTTPRequestHandler):
                 float(body.get("dt", 0.04)),
                 float(body.get("speed", DEFAULT_SPEED)),
             ),
+            "/api/gamepad/mode": lambda: SESSION.set_gamepad_control_mode(
+                str(body.get("mode", "joint"))
+            ),
+            "/api/gamepad/cartesian": lambda: SESSION.apply_cartesian_gamepad(
+                list(body["linear_velocity"]),
+                float(body.get("dt", 0.04)),
+                float(body.get("linear_speed", 0.03)),
+            ),
+            "/api/gamepad/cartesian/reset": SESSION.reset_cartesian_target,
             "/api/stop": active.stop,
             "/api/release_servos": active.release_servos,
             "/api/viewer/open": lambda: VIEWER.open(

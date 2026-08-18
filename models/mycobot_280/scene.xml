@@ -39,6 +39,10 @@
     <geom quat="0.000796327 0 0 1" type="mesh" contype="0" conaffinity="0"
           group="1" mesh="joint1_jet"/>
     <geom quat="0.000796327 0 0 1" type="mesh" mesh="joint1_jet"/>
+    <body name="cartesian_target" mocap="true" pos="0 0 -1">
+      <geom name="cartesian_target_marker" type="sphere" size="0.012"
+            rgba="1 0.2 0.1 0.85" contype="0" conaffinity="0"/>
+    </body>
     <body name="joint2" pos="0 0 0.15756">
       <inertial pos="-4.46252e-07 -0.0048982 -0.0203936"
                 quat="0.988685 0.150004 1.75753e-05 -6.19332e-05" mass="0.153266"

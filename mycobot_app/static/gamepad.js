@@ -13,9 +13,10 @@ const SEND_INTERVAL_MS = 40;
 const DEADZONE = 0.12;
 
 export class G30SController {
-  constructor({ api, getSpeed, isSimulationAllowed, ensureSimulation, onState, onSimulation, onMessage }) {
+  constructor({ api, getSpeed, getControlMode, isSimulationAllowed, ensureSimulation, onState, onSimulation, onMessage }) {
     this.api = api;
     this.getSpeed = getSpeed;
+    this.getControlMode = getControlMode || (() => "joint");
     this.isSimulationAllowed = isSimulationAllowed;
     this.ensureSimulation = ensureSimulation;
     this.onState = onState;
@@ -85,14 +86,23 @@ export class G30SController {
     if (statusText !== null) {
       this.statusText = statusText;
     }
+    const controlMode = this.getControlMode();
     this.onState({
       supported: this.supported,
       running: this.running,
       hold: this.hold,
       transport: this.transport,
+      controlMode,
       statusText: this.statusText,
       velocity: this.velocity,
+      commandVelocity: controlMode === "cartesian"
+        ? G30SController.mapCartesianVelocity(this.velocity)
+        : this.velocity,
     });
+  }
+
+  refreshState() {
+    this.emitState();
   }
 
   async detectAuthorization() {
@@ -281,7 +291,14 @@ export class G30SController {
     this.previousButtons = buttons;
 
     if (newlyPressed & 0x1000) {
-      void this.sendAction("/api/home", "手柄 A：已发送仿真回零位。");
+      if (this.getControlMode() === "cartesian") {
+        void this.sendAction(
+          "/api/gamepad/cartesian/reset",
+          "手柄 A：末端目标已重置到当前 TCP。",
+        );
+      } else {
+        void this.sendAction("/api/home", "手柄 A：已发送仿真回零位。");
+      }
     }
     if (newlyPressed & 0x2000) {
       this.hold = !this.hold;
@@ -319,9 +336,19 @@ export class G30SController {
     this.lastPost = now;
     this.postInFlight = true;
     const safeVelocity = this.hold ? [0, 0, 0, 0, 0, 0] : velocity;
-    void this.api("/api/gamepad", {
+    const controlMode = this.getControlMode();
+    const cartesian = controlMode === "cartesian";
+    const path = cartesian ? "/api/gamepad/cartesian" : "/api/gamepad";
+    const body = cartesian
+      ? {
+          linear_velocity: G30SController.mapCartesianVelocity(safeVelocity),
+          dt,
+          linear_speed: Math.min(Math.max(this.getSpeed() * 0.002, 0.005), 0.06),
+        }
+      : { velocity: safeVelocity, dt, speed: this.getSpeed() };
+    void this.api(path, {
       method: "POST",
-      body: JSON.stringify({ velocity: safeVelocity, dt, speed: this.getSpeed() }),
+      body: JSON.stringify(body),
     })
       .then(this.onSimulation)
       .catch((error) => {
@@ -336,6 +363,13 @@ export class G30SController {
 
   static matches(device) {
     return device.vendorId === VENDOR_ID && device.productId === PRODUCT_ID;
+  }
+
+  static mapCartesianVelocity(velocity) {
+    if (!Array.isArray(velocity) || velocity.length < 4) {
+      return [0, 0, 0];
+    }
+    return [velocity[0], -velocity[1], -velocity[3]];
   }
 
   static matchesStandardGamepad(gamepad) {
